@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="eclipse-ai",
-    version="1.0.0b1",
+    version="1.0.0b2",
     description="AI Powered Sensitive Information Detector",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
