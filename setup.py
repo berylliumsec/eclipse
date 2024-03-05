@@ -17,7 +17,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Security",
-        "Topic :: Text Processing :: Linguistic"
+        "Topic :: Text Processing :: Linguistic",
     ],
     license="BSD",
     keywords="AI, PII, Machine Learning, Sensitive Information Detection, Privacy",

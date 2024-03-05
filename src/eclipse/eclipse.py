@@ -18,7 +18,7 @@ from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.styles import Style
 from termcolor import cprint
 from transformers import BertForTokenClassification, BertTokenizerFast
-import logging
+
 logging.getLogger("transformers").setLevel(logging.ERROR)
 s3_url = "https://nebula-models.s3.amazonaws.com/ner_model_bert.zip"  # Update this with your actual S3 URL
 
@@ -354,7 +354,7 @@ def main():
         "-g",
         "--use_gpu",
         action="store_true",
-        help="Enable GPU usage for model inference."
+        help="Enable GPU usage for model inference.",
     )
     args = parser.parse_args()
 
