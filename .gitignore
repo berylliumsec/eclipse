@@ -1,0 +1,3 @@
+ner_model_bert
+*.pyc
+.DS_Store

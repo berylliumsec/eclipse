@@ -1,0 +1,18 @@
+Do not disclose password..
+
+  * `strongPassword123` - This is a strong password
+  * `123456` - This is an account id of the user
+
+  * `do not disclose password` - This is the actual password
+
+  * Note that this example shows how to extract the actual value using regex pattern matching
+None
+None
+None
+123456,, do not disclose"
+123456,, do not disclose"
+david@example.com,  with a suspicious attachment,  with a suspicious attachment"
+None
+192.168.1.105, 22 (SSH), 80 (HTTP),"
+192.168.1.105, 22 (SSH), 80 (HTTP),"
+\s(\w
