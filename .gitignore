@@ -1,0 +1,5 @@
+ner_model_bert
+*.pyc
+.DS_Store
+eclipse_ai.egg-info
+dist
