@@ -497,6 +497,7 @@ def main():
             print(f"Is High Confidence: {is_high_confidence}")
     elif args.file:
         # Adapt file processing as needed, similar to the prompt handling
+
         process_file(
             args.file,
             args.model_path,
@@ -504,7 +505,6 @@ def main():
             args.output,
             args.debug,
             args.delimiter,
-            args.line_by_line,
         )
 
 
@@ -521,14 +521,19 @@ def process_file(file_path, model_path, device, output_path, debug, delimiter):
             for line in lines:
                 line = line.strip()
                 if line:  # Avoid processing empty lines
+                    # Assume process_text is a function that processes the text and returns a tuple
+                    # containing the processed line, highest average label, highest average confidence,
+                    # and a boolean indicating if the confidence is high.
                     results.append(process_text(line, model_path, device))
 
         with open(output_path, "w") as html_file:
-            html_file.write("<html><body>\n")
-            for line, highest_avg_label, highest_avg_conf, high_conf in results:
+            html_file.write("<html><head><title>Processed Output</title></head><body>\n")
+            for result in results:
+                line, highest_avg_label, highest_avg_conf, high_conf = result
                 debug_info = ""
                 if debug:
                     debug_info = f" <small>(Highest Avg. Label: {highest_avg_label}, Highest Avg. Conf.: {sum(highest_avg_conf)/len(highest_avg_conf):.2f})</small>"
+                # Escape the line to convert any HTML special characters to their equivalent entities
                 colored_line = html.escape(line)
                 if high_conf:
                     colored_line = f"<span style='color: red;'>{colored_line}</span>"
@@ -537,7 +542,5 @@ def process_file(file_path, model_path, device, output_path, debug, delimiter):
         logging.info(f"Output written to {output_path}")
     except FileNotFoundError:
         logging.info(f"The file {file_path} was not found.")
-
-
 if __name__ == "__main__":
     main()
