@@ -174,40 +174,40 @@ def save_local_metadata(file_name, etag):
         json.dump({"etag": etag}, f)
 
 
-def ensure_model_folder_exists():
-    metadata_file = os.path.join(DEFAULT_MODEL_PATH, "metadata.json")
+def ensure_model_folder_exists(model_directory):
+    metadata_file = os.path.join(model_directory, "metadata.json")
     local_etag = get_local_metadata(metadata_file)
     s3_etag = get_s3_file_etag(s3_url)
     if s3_etag is None:
         return  # Exit if there's no internet connection or other issues with S3
 
     # Check if the model directory exists and has the same etag (metadata)
-    if folder_exists_and_not_empty(DEFAULT_MODEL_PATH) and local_etag == s3_etag:
-        cprint(f"Model directory {DEFAULT_MODEL_PATH} is up-to-date.", "green")
+    if folder_exists_and_not_empty(model_directory) and local_etag == s3_etag:
+        cprint(f"Model directory {model_directory} is up-to-date.", "green")
         return  # No need to update anything as local version matches S3 version
 
     # If folder doesn't exist, is empty, or etag doesn't match, prompt for download.
-    user_input = "y"
-    if local_etag and local_etag != s3_etag:
-        user_input = get_input_with_default(
-            "New versions of the models are available, would you like to download them? (y/n) "
-        )
+    user_input = get_input_with_default(
+        "New versions of the models are available, would you like to download them? (y/n) ",
+        default_text="y"  # Automatically opt for download if not specified otherwise
+    )
 
-    if user_input.lower() != "y":
+    if user_input.lower() != 'y':
         return  # Exit if user chooses not to update
 
     # Logic to remove the model directory if it exists
-    if os.path.exists(DEFAULT_MODEL_PATH):
+    if os.path.exists(model_directory):
         cprint("Removing existing model folder...", "yellow")
-        shutil.rmtree(DEFAULT_MODEL_PATH)
+        shutil.rmtree(model_directory)
 
     cprint(
-        f"{DEFAULT_MODEL_PATH} not found or is different. Downloading and unzipping...",
+        f"{model_directory} not found or is outdated. Downloading and unzipping...",
         "yellow",
     )
-    download_and_unzip(s3_url, f"{DEFAULT_MODEL_PATH}.zip")
+    download_and_unzip(s3_url, f"{model_directory}.zip")
     # Save new metadata
     save_local_metadata(metadata_file, s3_etag)
+
 
 
 def is_internet_available(host="8.8.8.8", port=53, timeout=3):
@@ -356,6 +356,13 @@ def main():
         action="store_true",
         help="Enable GPU usage for model inference.",
     )
+    parser.add_argument(
+    "-dir", "--model_directory",
+    type=str,
+    default=DEFAULT_MODEL_PATH,
+    help="Directory where the BERT model should be downloaded and unzipped."
+)
+
     args = parser.parse_args()
 
     # Determine whether to use the GPU or not based on the user's command line input
