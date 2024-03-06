@@ -6,7 +6,6 @@ import os
 import shutil
 import socket
 import subprocess
-import warnings
 from importlib.metadata import version
 from typing import List, Set, Tuple
 from zipfile import ZipFile
@@ -18,12 +17,6 @@ from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.styles import Style
 from transformers import BertForTokenClassification, BertTokenizerFast
 
-# Suppress specific warning from transformers
-warnings.filterwarnings(
-    action="ignore",
-    message="Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.",
-    category=UserWarning
-)
 # Configure basic logging
 # This will set the log level to ERROR, meaning only error and critical messages will be logged
 # You can specify a filename to write the logs to a file; otherwise, it will log to stderr
@@ -74,7 +67,7 @@ class ModelManager:
             self.device = torch.device(
                 "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
             )
-            self.tokenizer = BertTokenizerFast.from_pretrained(model_path)
+
             self.model = BertForTokenClassification.from_pretrained(model_path)
             self.model.config.id2label = id_to_label
             self.model.config.label2id = label_to_id
