@@ -11,8 +11,8 @@ from typing import List, Set, Tuple
 from zipfile import ZipFile
 
 import requests
-import transformers
 import torch
+import transformers
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.styles import Style
@@ -76,7 +76,6 @@ class ModelManager:
             self.model.to(self.device)
             self.model.eval()
             self.tokenizer = BertTokenizerFast.from_pretrained(model_path)
-
 
     @staticmethod
     def get_instance(model_path=DEFAULT_MODEL_PATH, device="cpu"):
@@ -327,7 +326,11 @@ def recognize_entities_bert(
 
 
 def process_text(
-    input_text: str, model_path: str, device: str, line_by_line: bool = False
+    input_text: str,
+    model_path: str,
+    device: str,
+    line_by_line: bool = False,
+    confidence_threshold: float = 0.80,
 ):
     # Ensure the model folder exists and is up to date
     ensure_model_folder_exists(model_path)
@@ -362,7 +365,11 @@ def process_text(
         return process_single(input_text)  # This returns a single tuple
 
 
-def process_single_line(line: str, model_manager, device):
+def process_single_line(
+    line: str, model_manager, device, confidence_threshold: float = 0.80
+):
+    # Rest of the function remains unchanged
+
     # Access the tokenizer and model from the model manager
     tokenizer = model_manager.tokenizer
     model = model_manager.model
@@ -406,7 +413,12 @@ def process_single_line(line: str, model_manager, device):
         highest_avg_conf = 0.0
 
     # Return the processed line information
-    return line, highest_avg_label, highest_avg_conf, average_confidence > 0.80
+    return (
+        line,
+        highest_avg_label,
+        highest_avg_conf,
+        average_confidence > confidence_threshold,
+    )
 
 
 def main():
@@ -461,6 +473,14 @@ def main():
         action="store_true",
         help="Process text line by line and yield results incrementally.",
     )
+    parser.add_argument(
+        "-c",
+        "--confidence_threshold",
+        type=float,
+        default=0.90,
+        help="Confidence threshold for considering predictions as high confidence.",
+    )
+
     args = parser.parse_args()
 
     # Early exit if only displaying help
@@ -482,14 +502,16 @@ def main():
                 highest_avg_label,
                 highest_avg_confidence,
                 is_high_confidence,
-            ) in process_text(args.prompt, args.model_path, device, True):
+            ) in process_text(
+                args.prompt, args.model_path, device, True, args.confidence_threshold
+            ):
                 print(f"Processed Text: {processed_text}")
                 print(f"Highest Average Label: {highest_avg_label}")
                 print(f"Highest Average Confidence: {highest_avg_confidence}")
                 print(f"Is High Confidence: {is_high_confidence}")
         else:
             # Process the entire text as a single block
-            
+
             (
                 processed_text,
                 highest_avg_label,
@@ -532,7 +554,9 @@ def process_file(file_path, model_path, device, output_path, debug, delimiter):
                     results.append(process_text(line, model_path, device))
 
         with open(output_path, "w") as html_file:
-            html_file.write("<html><head><title>Processed Output</title></head><body>\n")
+            html_file.write(
+                "<html><head><title>Processed Output</title></head><body>\n"
+            )
             for result in results:
                 line, highest_avg_label, highest_avg_conf, high_conf = result
                 debug_info = ""
@@ -548,5 +572,7 @@ def process_file(file_path, model_path, device, output_path, debug, delimiter):
         logging.info(f"Output written to {output_path}")
     except FileNotFoundError:
         logging.info(f"The file {file_path} was not found.")
+
+
 if __name__ == "__main__":
     main()
