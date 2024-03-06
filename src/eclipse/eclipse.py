@@ -20,11 +20,10 @@ from transformers import BertForTokenClassification, BertTokenizerFast
 
 # Suppress specific warning from transformers
 warnings.filterwarnings(
-    "ignore",
+    action="ignore",
     message="Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.",
+    category=UserWarning
 )
-
-
 # Configure basic logging
 # This will set the log level to ERROR, meaning only error and critical messages will be logged
 # You can specify a filename to write the logs to a file; otherwise, it will log to stderr
