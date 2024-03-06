@@ -151,7 +151,7 @@ Additional Options
 ## Usage as a module
 
 ```python
-from eclipse import process_text  # Replace 'your_script_name' with the actual name of the script without '.py'
+from eclipse import process_text 
 
 # Set the path to the pretrained BERT model. This should be the same as DEFAULT_MODEL_PATH in the script
 model_path = "./ner_model_bert"  

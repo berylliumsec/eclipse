@@ -3,3 +3,4 @@ ner_model_bert
 .DS_Store
 eclipse_ai.egg-info
 dist
+local_build.md
