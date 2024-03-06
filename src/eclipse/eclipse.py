@@ -11,12 +11,14 @@ from typing import List, Set, Tuple
 from zipfile import ZipFile
 
 import requests
+import transformers
 import torch
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.styles import Style
 from transformers import BertForTokenClassification, BertTokenizerFast
 
+transformers.logging.set_verbosity_error()
 # Configure basic logging
 # This will set the log level to ERROR, meaning only error and critical messages will be logged
 # You can specify a filename to write the logs to a file; otherwise, it will log to stderr
@@ -73,6 +75,8 @@ class ModelManager:
             self.model.config.label2id = label_to_id
             self.model.to(self.device)
             self.model.eval()
+            self.tokenizer = BertTokenizerFast.from_pretrained(model_path)
+
 
     @staticmethod
     def get_instance(model_path=DEFAULT_MODEL_PATH, device="cpu"):
@@ -485,6 +489,7 @@ def main():
                 print(f"Is High Confidence: {is_high_confidence}")
         else:
             # Process the entire text as a single block
+            
             (
                 processed_text,
                 highest_avg_label,
@@ -532,7 +537,8 @@ def process_file(file_path, model_path, device, output_path, debug, delimiter):
                 line, highest_avg_label, highest_avg_conf, high_conf = result
                 debug_info = ""
                 if debug:
-                    debug_info = f" <small>(Highest Avg. Label: {highest_avg_label}, Highest Avg. Conf.: {sum(highest_avg_conf)/len(highest_avg_conf):.2f})</small>"
+                    debug_info = f" <small>(Highest Avg. Label: {highest_avg_label}, Highest Avg. Conf.: {highest_avg_conf:.2f})</small>"
+
                 # Escape the line to convert any HTML special characters to their equivalent entities
                 colored_line = html.escape(line)
                 if high_conf:

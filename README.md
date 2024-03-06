@@ -114,8 +114,7 @@ pip install eclipse-ai --upgrade
 ## Usage.
 
 ``` bash
-usage: eclipse [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g]
-               [-dir MODEL_DIRECTORY]
+usage: eclipse [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g] [-dir MODEL_DIRECTORY] [--line_by_line]
 
 Entity recognition using BERT.
 
@@ -134,6 +133,7 @@ options:
   -g, --use_gpu         Enable GPU usage for model inference.
   -dir MODEL_DIRECTORY, --model_directory MODEL_DIRECTORY
                         Directory where the BERT model should be downloaded and unzipped.
+  --line_by_line        Process text line by line and yield results incrementally.
 ```
 
 Here are some examples:
@@ -153,54 +153,53 @@ Additional Options
 ## Usage as a module
 
 ```python
-from eclipse import process_text  # Make sure this is the correct import
+# Correct import based on your project structure
+from eclipse import process_text
 
 model_path = "./ner_model_bert"
 input_text = "Your example text here."
 
-line_by_line = True  # Change this to False if you want to process the whole text at once
+# Set this to True if you want to process the text line by line, or False to process all at once
+line_by_line = False
 
 try:
     # Handle both line-by-line processing and whole text processing
     if line_by_line:
         # Process the text line by line
-        for result in process_text(input_text, model_path, 'cpu', line_by_line=True):
+        for result in process_text(input_text, model_path, "cpu", line_by_line=False):
+            # In line-by-line mode, result should not be None, but check to be safe
             if result:
-                processed_text, highest_avg_label, highest_avg_confidence, is_high_confidence = result
+                (
+                    processed_text,
+                    highest_avg_label,
+                    highest_avg_confidence,
+                    is_high_confidence,
+                ) = result
                 print(f"Processed Text: {processed_text}")
                 print(f"Highest Average Label: {highest_avg_label}")
                 print(f"Highest Average Confidence: {highest_avg_confidence}")
                 print(f"Is High Confidence: {is_high_confidence}")
             else:
-                # If result is empty (which should not happen in line-by-line mode), assign default values
-                print("Processed Text: Error in processing")
-                print("Highest Average Label: Error")
-                print("Highest Average Confidence: Error")
-                print("Is High Confidence: Error")
+                print("Error: Empty result for a line.")
     else:
-        # If line_by_line is set to False, expecting a single result
-        result = process_text(input_text, model_path, 'cpu', line_by_line=False)
-        if result:  # Checking if result is not empty
-            processed_text, highest_avg_label, highest_avg_confidence, is_high_confidence = result
+        # Process the entire text as a single block
+        result = process_text(input_text, model_path, "cpu", line_by_line=False)
+        if result:
+            (
+                processed_text,
+                highest_avg_label,
+                highest_avg_confidence,
+                is_high_confidence,
+            ) = result
             print(f"Processed Text: {processed_text}")
             print(f"Highest Average Label: {highest_avg_label}")
             print(f"Highest Average Confidence: {highest_avg_confidence}")
             print(f"Is High Confidence: {is_high_confidence}")
         else:
-            # If result is empty, assign default values
-            print("Processed Text: Error in processing")
-            print("Highest Average Label: Error")
-            print("Highest Average Confidence: Error")
-            print("Is High Confidence: Error")
+            print("Error: Empty result for the text.")
 
 except Exception as e:  # Catching general exceptions
     print(f"Error processing text: {e}")
-    # Default error handling values
-    print("Processed Text: Error in processing")
-    print("Highest Average Label: Error")
-    print("Highest Average Confidence: Error")
-    print("Is High Confidence: Error")
-
 ```
 
 ## Understanding the Output
