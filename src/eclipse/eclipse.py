@@ -6,20 +6,46 @@ import os
 import shutil
 import socket
 import subprocess
-from collections import defaultdict
 from importlib.metadata import version
 from typing import List, Set, Tuple
 from zipfile import ZipFile
 
 import requests
 import torch
+import transformers
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.styles import Style
-from termcolor import cprint
 from transformers import BertForTokenClassification, BertTokenizerFast
 
-logging.getLogger("transformers").setLevel(logging.ERROR)
+transformers.logging.set_verbosity_error()
+# Configure basic logging
+# This will set the log level to ERROR, meaning only error and critical messages will be logged
+# You can specify a filename to write the logs to a file; otherwise, it will log to stderr
+log_file_path = os.path.join(os.path.expanduser("~"), "eclipse.log")
+
+# Configure basic logging
+# Get the user's home directory from the HOME environment variable
+home_directory = os.getenv("HOME")  # This returns None if 'HOME' is not set
+
+if home_directory:
+    log_file_path = os.path.join(home_directory, "eclipse.log")
+else:
+    # Fallback mechanism or throw an error
+    log_file_path = (
+        "eclipse.log"  # Default to current directory, or handle error as needed
+    )
+
+# Configure basic logging
+logging.basicConfig(
+    filename=log_file_path,
+    level=logging.ERROR,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
+
+# Test logging at different levels
+
 s3_url = "https://nebula-models.s3.amazonaws.com/ner_model_bert.zip"  # Update this with your actual S3 URL
 
 # Define the label mappings
@@ -35,9 +61,34 @@ id_to_label = {id: label for label, id in label_to_id.items()}
 DEFAULT_MODEL_PATH = "./ner_model_bert"
 
 
+class ModelManager:
+    instance = None
+
+    class __ModelManager:
+        def __init__(self, model_path, device):
+            self.device = torch.device(
+                "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
+            )
+
+            self.model = BertForTokenClassification.from_pretrained(model_path)
+            self.model.config.id2label = id_to_label
+            self.model.config.label2id = label_to_id
+            self.model.to(self.device)
+            self.model.eval()
+            self.tokenizer = BertTokenizerFast.from_pretrained(model_path)
+
+    @staticmethod
+    def get_instance(model_path=DEFAULT_MODEL_PATH, device="cpu"):
+        if ModelManager.instance is None:
+            ModelManager.instance = ModelManager.__ModelManager(model_path, device)
+        return ModelManager.instance
+
+
 def get_s3_file_etag(s3_url):
     if not is_internet_available():
-        cprint("No internet connection available. Skipping version check.", "red")
+        logging.error(
+            "No internet connection available. Skipping version check.", "red"
+        )
         return None
     response = requests.head(s3_url)
     return response.headers.get("ETag")
@@ -63,39 +114,45 @@ def get_latest_pypi_version(package_name):
         if response.status_code == 200:
             return response.json()["info"]["version"]
     except requests.exceptions.RequestException as e:
-        cprint(f"Failed to get latest version information: {e}", "red")
+        logging.error(f"Failed to get latest version information: {e}", "red")
     return None
 
 
 def check_new_pypi_version(package_name="eclipse-ai"):
     """Check if a newer version of the package is available on PyPI."""
     if not is_internet_available():
-        cprint("No internet connection available. Skipping version check.", "red")
+        logging.error(
+            "No internet connection available. Skipping version check.", "red"
+        )
         return
 
     try:
         installed_version = version(package_name)
     except Exception as e:
-        cprint(f"Error retrieving installed version of {package_name}: {e}", "red")
+        logging.error(
+            f"Error retrieving installed version of {package_name}: {e}", "red"
+        )
         return
 
-    cprint(f"Installed version: {installed_version}", "green")
+    logging.info(f"Installed version: {installed_version}", "green")
 
     try:
         latest_version = get_latest_pypi_version(package_name)
         if latest_version is None:
-            cprint(
+            logging.error(
                 f"Error retrieving latest version of {package_name} from PyPI.", "red"
             )
             return
 
         if latest_version > installed_version:
-            cprint(
+            logging.info(
                 f"A newer version ({latest_version}) of {package_name} is available on PyPI. Please consider updating to access the latest features!",
                 "yellow",
             )
     except Exception as e:
-        cprint(f"An error occurred while checking for the latest version: {e}", "red")
+        logging.error(
+            f"An error occurred while checking for the latest version: {e}", "red"
+        )
 
 
 def get_input_with_default(message, default_text=None):
@@ -121,7 +178,7 @@ def folder_exists_and_not_empty(folder_path):
 def download_and_unzip(url, output_name):
     try:
         # Download the file from the S3 bucket using wget with progress bar
-        print("Downloading...")
+        logging.info("Downloading...")
         subprocess.run(
             ["wget", "--progress=bar:force:noscroll", url, "-O", output_name],
             check=True,
@@ -131,7 +188,7 @@ def download_and_unzip(url, output_name):
         target_dir = os.path.splitext(output_name)[0]  # Removes '.zip' from output_name
 
         # Extract the ZIP file
-        print("\nUnzipping...")
+        logging.info("\nUnzipping...")
         with ZipFile(output_name, "r") as zip_ref:
             # Here we will extract in a temp directory to inspect the structure
             temp_dir = "temp_extract_dir"
@@ -162,10 +219,10 @@ def download_and_unzip(url, output_name):
         # Remove the ZIP file to clean up
         os.remove(output_name)
     except subprocess.CalledProcessError as e:
-        cprint(f"Error occurred during download: {e}", "red")
+        logging.error(f"Error occurred during download: {e}", "red")
         logging.error(f"Error occurred during download: {e}")
     except Exception as e:
-        cprint(f"Unexpected error: {e}", "red")
+        logging.error(f"Unexpected error: {e}", "red")
         logging.error(f"Unexpected error: {e}")
 
 
@@ -174,38 +231,42 @@ def save_local_metadata(file_name, etag):
         json.dump({"etag": etag}, f)
 
 
-def ensure_model_folder_exists():
-    metadata_file = os.path.join(DEFAULT_MODEL_PATH, "metadata.json")
+def ensure_model_folder_exists(model_directory, auto_update=True):
+    metadata_file = os.path.join(model_directory, "metadata.json")
     local_etag = get_local_metadata(metadata_file)
     s3_etag = get_s3_file_etag(s3_url)
     if s3_etag is None:
         return  # Exit if there's no internet connection or other issues with S3
 
     # Check if the model directory exists and has the same etag (metadata)
-    if folder_exists_and_not_empty(DEFAULT_MODEL_PATH) and local_etag == s3_etag:
-        cprint(f"Model directory {DEFAULT_MODEL_PATH} is up-to-date.", "green")
+    if folder_exists_and_not_empty(model_directory) and local_etag == s3_etag:
+        logging.info(f"Model directory {model_directory} is up-to-date.", "green")
         return  # No need to update anything as local version matches S3 version
 
-    # If folder doesn't exist, is empty, or etag doesn't match, prompt for download.
-    user_input = "y"
-    if local_etag and local_etag != s3_etag:
+    if not auto_update:
+        # If folder doesn't exist, is empty, or etag doesn't match, prompt for download.
         user_input = get_input_with_default(
-            "New versions of the models are available, would you like to download them? (y/n) "
+            "New versions of the models are available, would you like to download them? (y/n) ",
+            default_text="y",  # Automatically opt for download if not specified otherwise
         )
 
-    if user_input.lower() != "y":
-        return  # Exit if user chooses not to update
+        if user_input.lower() != "y":
+            return  # Exit if user chooses not to update
+    else:
+        logging.info(
+            "Auto-update is enabled. Downloading new version if necessary...", "yellow"
+        )
 
-    # Logic to remove the model directory if it exists
-    if os.path.exists(DEFAULT_MODEL_PATH):
-        cprint("Removing existing model folder...", "yellow")
-        shutil.rmtree(DEFAULT_MODEL_PATH)
+    # Proceed with the removal of the existing model directory and the download of the new version
+    if os.path.exists(model_directory):
+        logging.info("Removing existing model folder...", "yellow")
+        shutil.rmtree(model_directory)
 
-    cprint(
-        f"{DEFAULT_MODEL_PATH} not found or is different. Downloading and unzipping...",
+    logging.info(
+        f"{model_directory} not found or is outdated. Downloading and unzipping...",
         "yellow",
     )
-    download_and_unzip(s3_url, f"{DEFAULT_MODEL_PATH}.zip")
+    download_and_unzip(s3_url, f"{model_directory}.zip")
     # Save new metadata
     save_local_metadata(metadata_file, s3_etag)
 
@@ -259,64 +320,108 @@ def recognize_entities_bert(
         detected_labels = {label for label in predictions_labels if label != "O"}
         return detected_labels, predictions_labels, confidence_list, average_confidence
     except Exception as e:
-        print(f"An error occurred in recognize_entities_bert: {e}")
+        logging.error(f"An error occurred in recognize_entities_bert: {e}")
         # Return empty sets and lists if an error occurs
         return set(), [], [], 0.0
 
 
 def process_text(
-    input_text: str, model_path: str, device: str
-) -> Tuple[str, defaultdict, float, bool]:
-    try:
-        device = torch.device(
-            "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
+    input_text: str,
+    model_path: str,
+    device: str,
+    line_by_line: bool = False,
+    confidence_threshold: float = 0.80,
+):
+    # Ensure the model folder exists and is up to date
+    ensure_model_folder_exists(model_path)
+    # Get the singleton instance of the model manager for the specified model path and device
+    model_manager = ModelManager.get_instance(model_path, device)
+
+    # Define an inner function for processing a single line
+    def process_single(input_line):
+        try:
+            # Process the single line using the shared model and tokenizer
+            return process_single_line(input_line, model_manager, device)
+        except Exception as e:
+            logging.error(f"An error occurred while processing single line: {e}")
+            return input_line, "Error", [0], False
+
+    # Define an inner generator function for processing line by line
+    def process_multiple(input_lines):
+        for line in input_lines.split("\n"):
+            try:
+                # Yield results from processing each line individually
+                yield process_single_line(line, model_manager, device)
+            except Exception as e:
+                logging.error(
+                    f"An error occurred while processing line: {line}, Error: {e}"
+                )
+                yield line, "Error", [0], False
+
+    # Process the input text based on the line_by_line flag
+    if line_by_line:
+        return process_multiple(input_text)  # This returns a generator
+    else:
+        return process_single(input_text)  # This returns a single tuple
+
+
+def process_single_line(
+    line: str, model_manager, device, confidence_threshold: float = 0.80
+):
+    # Rest of the function remains unchanged
+
+    # Access the tokenizer and model from the model manager
+    tokenizer = model_manager.tokenizer
+    model = model_manager.model
+    device = model_manager.device  # Use device from the model manager
+
+    # Tokenize the input line
+    tokenized_inputs = tokenizer(
+        line, truncation=True, padding=True, max_length=512, return_tensors="pt"
+    )
+    tokenized_inputs = tokenized_inputs.to(device)
+
+    # Perform model inference
+    with torch.no_grad():
+        outputs = model(**tokenized_inputs)
+
+    # Process the model outputs
+    logits = outputs.logits
+    softmax = torch.nn.functional.softmax(logits, dim=-1)
+    confidence_scores, predictions = torch.max(softmax, dim=2)
+    average_confidence = confidence_scores.mean().item()
+
+    # Convert model predictions to labels
+    predictions_labels = [
+        model_manager.model.config.id2label.get(pred.item(), "O")
+        for pred in predictions[0]
+    ]
+    detected_labels = [label for label in predictions_labels if label != "O"]
+
+    # Find the most frequent label among detected labels, if any
+    if detected_labels:
+        highest_avg_label = max(set(detected_labels), key=detected_labels.count)
+        highest_avg_conf = (
+            confidence_scores[0][
+                predictions[0] == model_manager.model.config.label2id[highest_avg_label]
+            ]
+            .mean()
+            .item()
         )
-        tokenizer = BertTokenizerFast.from_pretrained(model_path)
-        model = BertForTokenClassification.from_pretrained(model_path)
+    else:
+        highest_avg_label = "None"  # Use 'None' if no entity detected
+        highest_avg_conf = 0.0
 
-        # Ensure the model uses the correct label mappings
-        model.config.id2label = id_to_label
-        model.config.label2id = label_to_id
-
-        model.to(device)
-        model.eval()
-
-        (
-            unique_labels_detected,
-            labels_detected,
-            confidences,
-            avg_confidence,
-        ) = recognize_entities_bert(input_text, model, tokenizer, device)
-
-        # Collate labels and their corresponding confidences
-        label_confidences = defaultdict(list)
-        for label, conf in zip(labels_detected, confidences):
-            label_confidences[label].append(conf)
-
-        # Determine the label with the highest average confidence
-        highest_avg_label, highest_avg_conf = max(
-            label_confidences.items(),
-            key=lambda lc: sum(lc[1]) / len(lc[1]),
-            default=("BENIGN", [avg_confidence]),
-        )
-
-        # Determine if non-'BENIGN' labels exist and average confidence is above threshold
-        non_benign_high_conf = (
-            "BENIGN" not in highest_avg_label and avg_confidence > 0.80
-        )
-        return input_text, highest_avg_label, highest_avg_conf, non_benign_high_conf
-    except Exception as e:
-        print(f"An error occurred in process_text: {e}")
-        # Return empty results and false for high confidence if an error occurs
-        return input_text, defaultdict(list), 0.0, False
+    # Return the processed line information
+    return (
+        line,
+        highest_avg_label,
+        highest_avg_conf,
+        average_confidence > confidence_threshold,
+    )
 
 
 def main():
-    # Check for new PyPI package version
-    check_new_pypi_version()
-    # Ensure the model folder exists and is updated
-    ensure_model_folder_exists()
-
     parser = argparse.ArgumentParser(description="Entity recognition using BERT.")
     parser.add_argument(
         "-p", "--prompt", type=str, help="Direct text prompt for recognizing entities."
@@ -356,55 +461,117 @@ def main():
         action="store_true",
         help="Enable GPU usage for model inference.",
     )
+    parser.add_argument(
+        "-dir",
+        "--model_directory",
+        type=str,
+        default=DEFAULT_MODEL_PATH,
+        help="Directory where the BERT model should be downloaded and unzipped.",
+    )
+    parser.add_argument(
+        "--line_by_line",
+        action="store_true",
+        help="Process text line by line and yield results incrementally.",
+    )
+    parser.add_argument(
+        "-c",
+        "--confidence_threshold",
+        type=float,
+        default=0.90,
+        help="Confidence threshold for considering predictions as high confidence.",
+    )
+
     args = parser.parse_args()
+
+    # Early exit if only displaying help
+    if not any([args.prompt, args.file]):
+        parser.print_help()
+        return
+
+    # Now we ensure the model folder exists if needed
+    if args.prompt or args.file:
+        ensure_model_folder_exists(args.model_directory, auto_update=True)
 
     # Determine whether to use the GPU or not based on the user's command line input
     device = "cuda" if args.use_gpu and torch.cuda.is_available() else "cpu"
-
     if args.prompt:
-        line, highest_avg_label, highest_avg_conf, high_conf = process_text(
-            args.prompt, args.model_path, device
-        )
-        # Print results with the highest average label and its confidence
-        print(
-            f"{line}: {highest_avg_label} (Highest Avg. Conf.: {sum(highest_avg_conf)/len(highest_avg_conf):.2f})"
-        )
+        if args.line_by_line:
+            # If line-by-line mode is enabled, iterate over generator
+            for (
+                processed_text,
+                highest_avg_label,
+                highest_avg_confidence,
+                is_high_confidence,
+            ) in process_text(
+                args.prompt, args.model_path, device, True, args.confidence_threshold
+            ):
+                print(f"Processed Text: {processed_text}")
+                print(f"Highest Average Label: {highest_avg_label}")
+                print(f"Highest Average Confidence: {highest_avg_confidence}")
+                print(f"Is High Confidence: {is_high_confidence}")
+        else:
+            # Process the entire text as a single block
+
+            (
+                processed_text,
+                highest_avg_label,
+                highest_avg_confidence,
+                is_high_confidence,
+            ) = process_text(args.prompt, args.model_path, device, False)
+            print(f"Processed Text: {processed_text}")
+            print(f"Highest Average Label: {highest_avg_label}")
+            print(f"Highest Average Confidence: {highest_avg_confidence}")
+            print(f"Is High Confidence: {is_high_confidence}")
     elif args.file:
-        try:
-            results = []
-            with open(args.file, "r") as file:
-                file_content = file.read()
-                lines = (
-                    file_content.split(args.delimiter)
-                    if args.delimiter != "\n"
-                    else file_content.splitlines()
-                )
-                for line in lines:
-                    line = line.strip()
-                    if line:  # Avoid processing empty lines
-                        results.append(process_text(line, args.model_path, device))
+        # Adapt file processing as needed, similar to the prompt handling
 
-            with open(args.output, "w") as html_file:
-                html_file.write("<html><body>\n")
-                for line, highest_avg_label, highest_avg_conf, high_conf in results:
-                    debug_info = ""
-                    if args.debug:
-                        debug_info = f" <small>(Highest Avg. Label: {highest_avg_label}, Highest Avg. Conf.: {sum(highest_avg_conf)/len(highest_avg_conf):.2f})</small>"
-
-                    colored_line = html.escape(line)
-                    if high_conf:
-                        colored_line = (
-                            f"<span style='color: red;'>{colored_line}</span>"
-                        )
-                    html_file.write(f"{colored_line}{debug_info}<br>\n")
-                html_file.write("</body></html>")
-            print(f"Output written to {args.output}")
-        except FileNotFoundError:
-            print(f"The file {args.file} was not found.")
-    else:
-        print(
-            "No input provided. Please use --prompt or --file to provide input text for entity recognition."
+        process_file(
+            args.file,
+            args.model_path,
+            device,
+            args.output,
+            args.debug,
+            args.delimiter,
         )
+
+
+def process_file(file_path, model_path, device, output_path, debug, delimiter):
+    try:
+        results = []
+        with open(file_path, "r") as file:
+            file_content = file.read()
+            lines = (
+                file_content.split(delimiter)
+                if delimiter != "\n"
+                else file_content.splitlines()
+            )
+            for line in lines:
+                line = line.strip()
+                if line:  # Avoid processing empty lines
+                    # Assume process_text is a function that processes the text and returns a tuple
+                    # containing the processed line, highest average label, highest average confidence,
+                    # and a boolean indicating if the confidence is high.
+                    results.append(process_text(line, model_path, device))
+
+        with open(output_path, "w") as html_file:
+            html_file.write(
+                "<html><head><title>Processed Output</title></head><body>\n"
+            )
+            for result in results:
+                line, highest_avg_label, highest_avg_conf, high_conf = result
+                debug_info = ""
+                if debug:
+                    debug_info = f" <small>(Highest Avg. Label: {highest_avg_label}, Highest Avg. Conf.: {highest_avg_conf:.2f})</small>"
+
+                # Escape the line to convert any HTML special characters to their equivalent entities
+                colored_line = html.escape(line)
+                if high_conf:
+                    colored_line = f"<span style='color: red;'>{colored_line}</span>"
+                html_file.write(f"{colored_line}{debug_info}<br>\n")
+            html_file.write("</body></html>")
+        logging.info(f"Output written to {output_path}")
+    except FileNotFoundError:
+        logging.info(f"The file {file_path} was not found.")
 
 
 if __name__ == "__main__":

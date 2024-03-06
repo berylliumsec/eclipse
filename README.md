@@ -114,7 +114,7 @@ pip install eclipse-ai --upgrade
 ## Usage.
 
 ``` bash
-usage: eclipse [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g]
+usage: eclipse [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g] [-dir MODEL_DIRECTORY] [--line_by_line]
 
 Entity recognition using BERT.
 
@@ -131,7 +131,9 @@ options:
   -d DELIMITER, --delimiter DELIMITER
                         Delimiter to separate text inputs, defaults to newline.
   -g, --use_gpu         Enable GPU usage for model inference.
-
+  -dir MODEL_DIRECTORY, --model_directory MODEL_DIRECTORY
+                        Directory where the BERT model should be downloaded and unzipped.
+  --line_by_line        Process text line by line and yield results incrementally.
 ```
 
 Here are some examples:
@@ -151,22 +153,53 @@ Additional Options
 ## Usage as a module
 
 ```python
-from eclipse import process_text  # Replace 'your_script_name' with the actual name of the script without '.py'
+# Correct import based on your project structure
+from eclipse import process_text
 
-# Set the path to the pretrained BERT model. This should be the same as DEFAULT_MODEL_PATH in the script
-model_path = "./ner_model_bert"  
-
-# Example text to process
+model_path = "./ner_model_bert"
 input_text = "Your example text here."
 
-# Process the text
-# The 'device' argument is either 'cpu' or 'cuda' depending on whether you are using CPU or GPU
-processed_text, highest_avg_label, highest_avg_confidence, is_high_confidence = process_text(input_text, model_path, 'cpu')
+# Set this to True if you want to process the text line by line, or False to process all at once
+line_by_line = False
 
-print(f"Processed Text: {processed_text}")
-print(f"Highest Average Label: {highest_avg_label}")
-print(f"Highest Average Confidence: {highest_avg_confidence}")
-print(f"Is High Confidence: {is_high_confidence}")
+try:
+    # Handle both line-by-line processing and whole text processing
+    if line_by_line:
+        # Process the text line by line
+        for result in process_text(input_text, model_path, "cpu", line_by_line=False):
+            # In line-by-line mode, result should not be None, but check to be safe
+            if result:
+                (
+                    processed_text,
+                    highest_avg_label,
+                    highest_avg_confidence,
+                    is_high_confidence,
+                ) = result
+                print(f"Processed Text: {processed_text}")
+                print(f"Highest Average Label: {highest_avg_label}")
+                print(f"Highest Average Confidence: {highest_avg_confidence}")
+                print(f"Is High Confidence: {is_high_confidence}")
+            else:
+                print("Error: Empty result for a line.")
+    else:
+        # Process the entire text as a single block
+        result = process_text(input_text, model_path, "cpu", line_by_line=False)
+        if result:
+            (
+                processed_text,
+                highest_avg_label,
+                highest_avg_confidence,
+                is_high_confidence,
+            ) = result
+            print(f"Processed Text: {processed_text}")
+            print(f"Highest Average Label: {highest_avg_label}")
+            print(f"Highest Average Confidence: {highest_avg_confidence}")
+            print(f"Is High Confidence: {is_high_confidence}")
+        else:
+            print("Error: Empty result for the text.")
+
+except Exception as e:  # Catching general exceptions
+    print(f"Error processing text: {e}")
 ```
 
 ## Understanding the Output
