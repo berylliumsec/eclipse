@@ -114,9 +114,9 @@ pip install eclipse-ai --upgrade
 ## Usage.
 
 ``` bash
-usage: eclipse [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g] [-dir MODEL_DIRECTORY] [--line_by_line]
+usage: eclipse.py [-h] [-p PROMPT] [-f FILE] [-m MODEL_PATH] [-o OUTPUT] [--debug] [-d DELIMITER] [-g] [--line_by_line] [-c CONFIDENCE_THRESHOLD]
 
-Entity recognition using BERT.
+Sensitive Information Detector.
 
 options:
   -h, --help            show this help message and exit
@@ -131,9 +131,9 @@ options:
   -d DELIMITER, --delimiter DELIMITER
                         Delimiter to separate text inputs, defaults to newline.
   -g, --use_gpu         Enable GPU usage for model inference.
-  -dir MODEL_DIRECTORY, --model_directory MODEL_DIRECTORY
-                        Directory where the BERT model should be downloaded and unzipped.
   --line_by_line        Process text line by line and yield results incrementally.
+  -c CONFIDENCE_THRESHOLD, --confidence_threshold CONFIDENCE_THRESHOLD
+                        Confidence threshold for considering predictions as high confidence.
 ```
 
 Here are some examples:

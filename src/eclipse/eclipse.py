@@ -422,7 +422,7 @@ def process_single_line(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Entity recognition using BERT.")
+    parser = argparse.ArgumentParser(description="Sensitive Information Detector.")
     parser.add_argument(
         "-p", "--prompt", type=str, help="Direct text prompt for recognizing entities."
     )
@@ -461,13 +461,7 @@ def main():
         action="store_true",
         help="Enable GPU usage for model inference.",
     )
-    parser.add_argument(
-        "-dir",
-        "--model_directory",
-        type=str,
-        default=DEFAULT_MODEL_PATH,
-        help="Directory where the BERT model should be downloaded and unzipped.",
-    )
+
     parser.add_argument(
         "--line_by_line",
         action="store_true",
@@ -490,7 +484,7 @@ def main():
 
     # Now we ensure the model folder exists if needed
     if args.prompt or args.file:
-        ensure_model_folder_exists(args.model_directory, auto_update=True)
+        ensure_model_folder_exists(args.model_path, auto_update=True)
 
     # Determine whether to use the GPU or not based on the user's command line input
     device = "cuda" if args.use_gpu and torch.cuda.is_available() else "cpu"
