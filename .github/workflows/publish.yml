@@ -10,6 +10,8 @@ on:
 jobs:
   release-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # This line adds write permissions for this job
 
     steps:
     - name: Check out the repo
