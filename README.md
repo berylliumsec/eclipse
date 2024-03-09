@@ -6,15 +6,17 @@ Welcome to eclipse.
 
 ## Galaxy
 
+- [eclipse](#eclipse)
   - [Galaxy](#galaxy)
   - [Acknowledgement](#acknowledgement)
   - [Why Eclipse?](#why-eclipse)
+    - [Appropriate Use Cases for Eclipse:](#appropriate-use-cases-for-eclipse)
+    - [Limitations:](#limitations)
   - [Compatibility](#compatibility)
   - [System dependencies](#system-dependencies)
-  - [Installation](#installation)
   - [Upgrading](#upgrading)
   - [Usage.](#usage)
-  - [Usage as a Module](#usage-as-a-module)
+  - [Usage as a module](#usage-as-a-module)
   - [Understanding the Output](#understanding-the-output)
 
 
@@ -28,7 +30,7 @@ Welcome to eclipse.
 
 ## Why Eclipse?
 
-In today's digital age, the confidentiality and privacy of information are paramount. Eclipse is designed to address the growing concerns surrounding sensitive data management. Unlike traditional methods, Eclipse is not limited to identifying explicitly defined sensitive information; it delves deeper, detecting any sentences that may hint at or contain sensitive information.
+Eclipse was designed as a part of [Nebula Pro](https://www.berylliumsec.com/nebula-pro-overview), the first AI Powered Penetration Testing Application. Eclipse was designed to address the growing concerns surrounding sensitive data management. Unlike traditional methods, Eclipse is not limited to identifying explicitly defined sensitive information; it delves deeper, detecting any sentences that may hint at or contain sensitive information.
 
 **Sensitive Information Detection**: Eclipse can process documents to identify not only explicit sensitive information but also sentences that suggest the presence of such data else where. This makes it a useful invaluable tool for preliminary reviews when you need to quickly identify potential sensitive content in your documents.
 
