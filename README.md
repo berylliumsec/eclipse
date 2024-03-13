@@ -24,9 +24,7 @@ Welcome to eclipse.
 
 **First i would like to thank the All-Mighty God who is the source of all knowledge, without Him, this would not be possible.**
 
-
-
-
+## [Click Here to Watch Eclipse in Action](https://youtu.be/aDIUucyUeew?feature=shared)
 
 ## Why Eclipse?
 
